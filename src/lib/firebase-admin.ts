@@ -1,0 +1,28 @@
+import { cert, getApp, getApps, initializeApp, type ServiceAccount } from "firebase-admin/app";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
+
+let cached: Firestore | null = null;
+
+export function db(): Firestore {
+  if (cached) return cached;
+
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT não está configurada nas variáveis de ambiente.");
+
+  let parsed: ServiceAccount & { private_key?: string };
+  try {
+    const json = raw.trim().startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8");
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error("FIREBASE_SERVICE_ACCOUNT não é um JSON válido.");
+  }
+  if (parsed.private_key) parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+
+  const app = getApps().length ? getApp() : initializeApp({ credential: cert(parsed) });
+  cached = getFirestore(app);
+  try { cached.settings({ ignoreUndefinedProperties: true }); } catch { /* já configurado */ }
+  return cached;
+}
+
+export const COL = "devolucoes";
+export const APP_DOC = (name: string) => db().collection("app").doc(name);

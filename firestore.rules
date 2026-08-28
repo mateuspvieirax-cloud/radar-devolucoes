@@ -1,0 +1,10 @@
+rules_version = '2';
+// O aplicativo acessa o Firestore apenas pelo servidor (Admin SDK), que ignora estas regras.
+// Nenhum acesso direto do navegador é permitido — é isso que mantém os dados fechados.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
