@@ -14,9 +14,14 @@ O que sobra sem baixa é o que sumiu no caminho de volta.
 - **Next.js 15** com App Router. Tudo roda no servidor; o navegador nunca fala com o Firestore.
 - **Firestore** acessado só pelo Admin SDK, no servidor. As regras de segurança negam
   qualquer acesso direto do cliente — é isso que mantém os dados fechados.
-- **Acesso por link secreto**: uma chave (`APP_KEY`) no endereço, uma vez. O `middleware.ts`
-  troca a chave por um cookie httpOnly de 180 dias e limpa a URL. Sem cookie válido,
-  qualquer página responde 404 e qualquer rota de API responde 401.
+- **Acesso aberto pelo endereço.** Quem tem o link do app entra. Não há login nem chave.
+  A página não é indexada por buscador (`robots.txt` + cabeçalho `noindex`), mas isso não
+  é proteção — só evita que ela apareça no Google.
+- **Dá para fechar depois sem mexer no código.** Crie a variável `APP_KEY` na Vercel com
+  uma string longa e aleatória e faça um novo deploy: o app passa a exigir uma entrada
+  única por `/?k=SUA_CHAVE`, que vira um cookie httpOnly de 180 dias. Sem esse cookie,
+  toda página responde 404 e toda rota de API responde 401. Já está pronto no
+  `src/middleware.ts` — é só ligar.
 - **Sem login individual.** Não dá para saber quem fez o quê. Se um dia isso passar a
   importar, o caminho é trocar o middleware por Firebase Auth — o resto do código não muda.
 
@@ -56,26 +61,21 @@ git remote add origin https://github.com/SEU-USUARIO/radar-devolucoes.git
 git push -u origin main
 ```
 
-Crie o repositório **privado** em `github.com/new` antes do `git push`.
+Crie o repositório em `github.com/new` antes do `git push`. Público ou privado, tanto faz:
+nenhuma senha mora no código — a credencial do Firebase fica só nas variáveis da Vercel.
 
 ### 3. Vercel
 
 1. Acesse `vercel.com`, entre com o GitHub e clique em **Add New → Project**.
 2. Escolha o repositório `radar-devolucoes`. A Vercel reconhece o Next.js sozinho —
    não mexa em nada na tela de build.
-3. Antes de clicar em Deploy, abra **Environment Variables** e crie as duas:
+3. Antes de clicar em Deploy, abra **Environment Variables** e crie **uma** variável:
 
    | Nome | Valor |
    |---|---|
-   | `APP_KEY` | uma chave longa e aleatória (veja abaixo) |
    | `FIREBASE_SERVICE_ACCOUNT` | o conteúdo **inteiro** do `.json` da conta de serviço, em uma linha só |
 
-   Para gerar a `APP_KEY`, rode no terminal:
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
-   ```
-
-   Para o `FIREBASE_SERVICE_ACCOUNT`, abra o `.json` no editor de texto, copie tudo
+   Abra o `.json` no editor de texto, copie tudo
    (começa com `{` e termina com `}`) e cole. Se a Vercel reclamar das quebras de linha,
    converta para base64 e cole o resultado — o código aceita os dois formatos:
    ```bash
@@ -86,19 +86,26 @@ Crie o repositório **privado** em `github.com/new` antes do `git push`.
 
 ### 4. Primeiro acesso
 
-Abra uma vez, com a chave no endereço:
-
 ```
-https://SEU-APP.vercel.app/?k=SUA_APP_KEY
+https://SEU-APP.vercel.app
 ```
 
-O cookie fica gravado por 180 dias. Depois disso o endereço limpo já funciona sozinho.
-Mande esse link com a chave para cada pessoa que vai usar, uma vez, e peça para salvar
-nos favoritos **o endereço sem a chave**.
+Abre direto. Mande o link para quem vai usar e peça para salvar nos favoritos.
 
-**Para revogar o acesso de todo mundo** (funcionária saiu, link vazou): troque a `APP_KEY`
-nas variáveis da Vercel e faça um novo deploy. Todos os cookies antigos param de valer
-na hora, e você distribui o link novo para quem continua.
+Uma sugestão que não custa nada: em **Settings → General** na Vercel, renomeie o projeto
+para algo que ninguém adivinha (`rvx-mesa-7fq2`, por exemplo) em vez de `radar-devolucoes`.
+O endereço fica bem mais difícil de achar por tentativa.
+
+#### Se um dia quiser fechar o acesso
+
+1. Gere uma chave: `node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"`
+2. Na Vercel, **Settings → Environment Variables**, crie `APP_KEY` com esse valor.
+3. **Deployments → Redeploy.**
+
+Pronto: o endereço limpo passa a responder 404, e o acesso passa a ser uma entrada única
+por `https://SEU-APP.vercel.app/?k=SUA_CHAVE`, que grava um cookie de 180 dias no navegador
+de cada pessoa. Para revogar tudo depois, troque a `APP_KEY` e faça outro deploy.
+Nenhuma linha de código muda em nenhum dos dois sentidos.
 
 ---
 
@@ -106,9 +113,9 @@ na hora, e você distribui o link novo para quem continua.
 
 ```bash
 npm install
-cp .env.example .env.local   # preencha APP_KEY e FIREBASE_SERVICE_ACCOUNT
+cp .env.example .env.local   # preencha FIREBASE_SERVICE_ACCOUNT
 npm run dev
-# abra http://localhost:3000/?k=SUA_APP_KEY
+# abra http://localhost:3000
 ```
 
 Atenção: rodando local você fala com o **mesmo** Firestore da produção. Se quiser separar,
@@ -129,10 +136,11 @@ crie um segundo projeto no Firebase só para testes.
 
 ```
 src/
-  middleware.ts              porta de entrada: link secreto → cookie
+  middleware.ts              porta de entrada (aberta; fecha se você criar APP_KEY)
   app/
     page.tsx                 carrega os dados no servidor e monta a tela
     layout.tsx, globals.css
+    robots.ts                mantém o app fora dos buscadores
     api/
       devolucoes/            GET lista · PATCH [id] atualiza uma
       import/                POST recebe as linhas do CSV, deduplica e grava

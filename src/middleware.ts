@@ -2,8 +2,20 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const COOKIE = "rvx_radar";
 
-function matches(given: string | null | undefined, expected: string | undefined): boolean {
-  if (!given || !expected || expected.length < 8) return false;
+/**
+ * A porta de entrada do app.
+ *
+ * Se a variável APP_KEY NÃO estiver configurada, o app é aberto: o endereço da
+ * Vercel funciona direto, sem chave e sem senha. É assim que ele está hoje.
+ *
+ * Se um dia você quiser fechar o acesso, basta criar a variável APP_KEY na Vercel
+ * (uma string longa e aleatória) e fazer um novo deploy. A partir daí o app só
+ * abre para quem entrar uma vez por  /?k=SUA_CHAVE  — nada mais precisa mudar
+ * no código.
+ */
+
+function matches(given: string | null | undefined, expected: string): boolean {
+  if (!given) return false;
   if (given.length !== expected.length) return false;
   let diff = 0;
   for (let i = 0; i < expected.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
@@ -11,10 +23,14 @@ function matches(given: string | null | undefined, expected: string | undefined)
 }
 
 export function middleware(req: NextRequest) {
-  const expected = process.env.APP_KEY;
+  const expected = (process.env.APP_KEY || "").trim();
+
+  // Sem APP_KEY configurada: acesso aberto.
+  if (expected.length < 8) return NextResponse.next();
+
   const url = req.nextUrl;
 
-  // 1) Link secreto: /?k=CHAVE — grava o cookie e limpa a URL.
+  // 1) Link com a chave: /?k=CHAVE — grava o cookie e limpa a URL.
   const k = url.searchParams.get("k");
   if (k && matches(k, expected)) {
     const clean = url.clone();
