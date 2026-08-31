@@ -75,6 +75,11 @@ nenhuma senha mora no código — a credencial do Firebase fica só nas variáve
    |---|---|
    | `FIREBASE_SERVICE_ACCOUNT` | o conteúdo **inteiro** do `.json` da conta de serviço, em uma linha só |
 
+   Se o painel travar com um valor tão longo, dá para partir em duas variáveis:
+   `FIREBASE_SERVICE_ACCOUNT_1` com a primeira metade e `FIREBASE_SERVICE_ACCOUNT_2`
+   com a segunda — o código concatena as duas nessa ordem. **É assim que a instalação
+   atual está configurada**, com o JSON em base64 partido ao meio.
+
    Abra o `.json` no editor de texto, copie tudo
    (começa com `{` e termina com `}`) e cole. Se a Vercel reclamar das quebras de linha,
    converta para base64 e cole o resultado — o código aceita os dois formatos:
