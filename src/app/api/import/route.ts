@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { COL, db } from "@/lib/firebase-admin";
 import { docId, parseDate, parseMoney, todayISO } from "@/lib/domain";
+import { pedidoPlausivel } from "@/lib/csv";
 import { CANAIS, type Canal, type Devolucao } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,9 @@ export async function POST(req: Request) {
 
     for (const l of linhas) {
       const pedido = String(l.pedido || "").trim();
-      if (!pedido) { semPedido++; continue; }
+      // Barreira final: se o arquivo foi lido errado (um .xlsx tratado como texto, por
+      // exemplo), o "pedido" vem com lixo binário. Nada disso entra no banco.
+      if (!pedidoPlausivel(pedido)) { semPedido++; continue; }
       const id = docId(canal, pedido);
       if (vistos.has(id)) continue;
       vistos.add(id);

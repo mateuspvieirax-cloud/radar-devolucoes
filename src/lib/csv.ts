@@ -83,3 +83,27 @@ export function csvEscape(v: unknown): string {
   const s = String(v === null || v === undefined ? "" : v);
   return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
+
+/**
+ * Detecta arquivo binário (xlsx, xls, zip, pdf) lido por engano como texto.
+ * Um relatório de verdade não tem bytes de controle nas primeiras linhas.
+ */
+export function pareceBinario(text: string): boolean {
+  const amostra = text.slice(0, 4000);
+  if (!amostra) return false;
+  if (amostra.startsWith("PK")) return true;            // zip / xlsx / ods
+  if (amostra.startsWith("%PDF")) return true;          // pdf
+  // eslint-disable-next-line no-control-regex
+  const controle = (amostra.match(/[\u0000-\u0008\u000E-\u001F]/g) || []).length;
+  return controle / amostra.length > 0.01;
+}
+
+/** Um número de pedido de verdade não tem caracteres de controle nem é gigante. */
+export function pedidoPlausivel(v: string): boolean {
+  if (!v) return false;
+  const s = v.trim();
+  if (s.length < 3 || s.length > 60) return false;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001F\uFFFD]/.test(s)) return false;
+  return /[A-Za-z0-9]/.test(s);
+}

@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useRef, useState } from "react";
-import { autoMap, detectDelim, mapFromNames, parseCSV } from "@/lib/csv";
+import { autoMap, detectDelim, mapFromNames, pareceBinario, parseCSV, pedidoPlausivel } from "@/lib/csv";
 import { brl, docId, parseDate, parseMoney, todayISO } from "@/lib/domain";
 import { CAMPOS, CANAIS, type Canal, type Devolucao, type Mappings } from "@/lib/types";
 
@@ -24,7 +24,15 @@ export default function Importar({ rows, maps, onImportado }: Props) {
   function analisar(texto?: string) {
     const text = texto ?? raw;
     setMsg(null);
-    if (!text.trim()) { setMsg("Cole o conteúdo do CSV primeiro."); setTabela(null); return; }
+    if (!text.trim()) { setMsg("Cole o conteúdo do relatório primeiro."); setTabela(null); return; }
+    if (pareceBinario(text)) {
+      setMsg(
+        "Esse conteúdo é de um arquivo do Excel (.xlsx), não dá para colar como texto. " +
+        "Use o botão Arquivo aqui do lado e escolha o .xlsx — eu leio direto."
+      );
+      setTabela(null);
+      return;
+    }
     const linhas = parseCSV(text, detectDelim(text));
     if (linhas.length < 2) {
       setMsg("Não consegui separar as colunas. Confira se o arquivo tem cabeçalho e mais de uma linha.");
@@ -49,7 +57,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
         return i === undefined ? "" : String(cols[i] ?? "").trim();
       };
       const pedido = g("pedido");
-      if (!pedido) { semPedido++; continue; }
+      if (!pedidoPlausivel(pedido)) { semPedido++; continue; }
       const id = docId(canal, pedido);
       if (existentes.has(id) || vistos.has(id)) { dup++; continue; }
       vistos.add(id);
@@ -75,7 +83,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
           o[f.k] = i === undefined ? "" : String(cols[i] ?? "").trim();
         }
         return o;
-      }).filter((o) => o.pedido);
+      }).filter((o) => pedidoPlausivel(o.pedido));
 
       const res = await fetch("/api/import", {
         method: "POST",
@@ -105,7 +113,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
         <h2>Importar devoluções do painel</h2>
         <p className="help">
           Exporte o relatório de devoluções do canal e cole o conteúdo abaixo (ou escolha o arquivo).
-          Aceita CSV com vírgula, ponto e vírgula ou tabulação. O mapeamento das colunas fica salvo
+          Aceita a planilha .xlsx do painel direto, ou CSV com vírgula, ponto e vírgula ou tabulação. O mapeamento das colunas fica salvo
           por canal — você só faz isso uma vez.
         </p>
 
@@ -118,9 +126,49 @@ export default function Importar({ rows, maps, onImportado }: Props) {
           </div>
           <div className="fld">
             <label>Arquivo</label>
-            <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" onChange={(e) => {
+            <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xlsx" onChange={(e) => {
               const f = e.target.files?.[0];
               if (!f) return;
+              setMsg(null);
+              if (/\.xlsx$/i.test(f.name)) {
+                setMsg("Lendo a planilha…");
+                import("read-excel-file/browser")
+                  .then((m) => m.default(f))
+                  .then((linhas) => {
+                    // A biblioteca devolve as planilhas do arquivo; usamos a primeira
+                    // que tenha conteúdo.
+                    type Planilha = { sheet?: string; data?: unknown[][] };
+                    const bruto = linhas as unknown as Planilha[] | unknown[][];
+                    const primeira = Array.isArray(bruto[0]) ? (bruto as unknown[][]) : null;
+                    const celulas: unknown[][] =
+                      primeira ??
+                      ((bruto as Planilha[]).find((p) => (p?.data?.length || 0) > 1)?.data ??
+                        (bruto as Planilha[])[0]?.data ??
+                        []);
+                    const grade = celulas.map((l) =>
+                      (Array.isArray(l) ? l : []).map((c) =>
+                        c === null || c === undefined ? "" : String(c).trim()
+                      )
+                    );
+                    const uteis = grade.filter((l) => l.some((c) => c !== ""));
+                    if (uteis.length < 2) {
+                      setMsg("A planilha não tem linhas de dados abaixo do cabeçalho.");
+                      setTabela(null);
+                      return;
+                    }
+                    setRaw("");
+                    setTabela(uteis);
+                    const salvo = maps[canal];
+                    setMap(salvo ? mapFromNames(salvo, uteis[0]) : autoMap(uteis[0]));
+                    setMsg(null);
+                  })
+                  .catch(() => setMsg("Não consegui abrir essa planilha. Confira se o arquivo é .xlsx."));
+                return;
+              }
+              if (/\.xls$/i.test(f.name)) {
+                setMsg("Esse é um Excel antigo (.xls). Abra no Excel e salve como .xlsx ou CSV.");
+                return;
+              }
               const fr = new FileReader();
               fr.onload = () => { const t = String(fr.result || ""); setRaw(t); analisar(t); };
               fr.readAsText(f, "utf-8");
@@ -128,7 +176,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
           </div>
         </div>
 
-        <textarea placeholder="Cole aqui o conteúdo do CSV, com a linha de cabeçalho."
+        <textarea placeholder="Cole aqui o conteúdo do CSV, com a linha de cabeçalho. Para .xlsx, use o botão Arquivo acima."
           value={raw} onChange={(e) => setRaw(e.target.value)} />
 
         <div className="row" style={{ marginTop: ".8rem" }}>
@@ -178,7 +226,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
                 <div className="preview">
                   Novas devoluções a importar: <b>{previa.novas.length}</b><br />
                   Já estavam na lista (ignoradas): {previa.dup}<br />
-                  {previa.semPedido > 0 && <><span className="bad">Linhas sem número de pedido: {previa.semPedido}</span><br /></>}
+                  {previa.semPedido > 0 && <><span className="bad">Linhas descartadas (sem número de pedido válido): {previa.semPedido}</span><br /></>}
                   Valor total das novas: <b>{brl(previa.novas.reduce((a, r) => a + (r.valor || 0), 0))}</b>
                 </div>
                 {previa.novas[0] && (
