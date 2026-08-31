@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     if (linhas.length > 3000) return NextResponse.json({ erro: "arquivo_muito_grande" }, { status: 400 });
 
     const agora = new Date().toISOString();
-    const vistos = new Set<string>();
+    const porId = new Map<string, Devolucao>();
     const candidatos: Devolucao[] = [];
     let semPedido = 0;
 
@@ -32,9 +32,11 @@ export async function POST(req: Request) {
       // exemplo), o "pedido" vem com lixo binário. Nada disso entra no banco.
       if (!pedidoPlausivel(pedido)) { semPedido++; continue; }
       const id = docId(canal, pedido);
-      if (vistos.has(id)) continue;
-      vistos.add(id);
-      candidatos.push({
+      // Uma linha por item no relatório: o mesmo pedido pode repetir. Vira um registro
+      // só, com os valores dos itens somados.
+      const jaVisto = porId.get(id);
+      if (jaVisto) { jaVisto.valor = (jaVisto.valor || 0) + parseMoney(l.valor); continue; }
+      const novo: Devolucao = {
         id, canal, pedido,
         produto: String(l.produto || "").trim(),
         sku: String(l.sku || "").trim(),
@@ -48,7 +50,9 @@ export async function POST(req: Request) {
         estado: "esperando",
         criadoEm: agora,
         updatedAt: agora,
-      });
+      };
+      porId.set(id, novo);
+      candidatos.push(novo);
     }
 
     const firestore = db();

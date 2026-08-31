@@ -47,7 +47,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
   const previa = useMemo(() => {
     if (!tabela || map.pedido === undefined) return null;
     const existentes = new Set(rows.map((r) => r.id));
-    const vistos = new Set<string>();
+    const vistos = new Map<string, Partial<Devolucao>>();
     const novas: Partial<Devolucao>[] = [];
     let dup = 0, semPedido = 0;
 
@@ -59,17 +59,30 @@ export default function Importar({ rows, maps, onImportado }: Props) {
       const pedido = g("pedido");
       if (!pedidoPlausivel(pedido)) { semPedido++; continue; }
       const id = docId(canal, pedido);
-      if (existentes.has(id) || vistos.has(id)) { dup++; continue; }
-      vistos.add(id);
-      novas.push({
+      if (existentes.has(id)) { dup++; continue; }
+      // Os relatórios trazem uma linha por item: o mesmo pedido pode repetir. Juntamos
+      // num registro só (é um pacote só que volta) somando o valor dos itens.
+      const jaVista = vistos.get(id);
+      if (jaVista) { jaVista.valor = (jaVista.valor || 0) + parseMoney(g("valor")); dup++; continue; }
+      const nova: Partial<Devolucao> = {
         pedido, produto: g("produto"), sku: g("sku"),
         valor: parseMoney(g("valor")), motivo: g("motivo"),
         aprovadaEm: parseDate(g("aprovadaEm")) || todayISO(),
         rastreio: g("rastreio"), ultimoEventoEm: parseDate(g("ultimoEventoEm")),
         comprador: g("comprador"), statusPlataforma: g("statusPlataforma"),
-      });
+      };
+      vistos.set(id, nova);
+      novas.push(nova);
     }
-    return { novas, dup, semPedido };
+
+    // Aviso: relatório de pedidos CANCELADOS não é relatório de devolução. Cancelamento
+    // acontece antes do envio — não existe pacote voltando para conferir.
+    const cancelados = novas.filter((r) =>
+      /cancelad/i.test(String(r.statusPlataforma || "") + " " + String(r.motivo || ""))
+    ).length;
+    const pareceCancelamento = novas.length >= 5 && cancelados / novas.length > 0.6;
+
+    return { novas, dup, semPedido, pareceCancelamento };
   }, [tabela, map, rows, canal]);
 
   async function importar() {
@@ -223,6 +236,18 @@ export default function Importar({ rows, maps, onImportado }: Props) {
               </div>
             ) : previa && (
               <>
+                {previa.pareceCancelamento && (
+                  <div className="warnbox">
+                    <p>
+                      <strong>Atenção: isso parece um relatório de pedidos cancelados.</strong>{" "}
+                      Cancelamento acontece antes do envio — não existe pacote voltando, então
+                      essas linhas nunca vão ser bipadas e vão ficar presas em &ldquo;esperando&rdquo;
+                      para sempre. O relatório certo é o de <strong>devoluções e reembolsos</strong>
+                      {" "}(e, para pacotes que voltaram sozinhos, o de <strong>falha na
+                      entrega</strong>). Se quiser importar assim mesmo, pode seguir.
+                    </p>
+                  </div>
+                )}
                 <div className="preview">
                   Novas devoluções a importar: <b>{previa.novas.length}</b><br />
                   Já estavam na lista (ignoradas): {previa.dup}<br />

@@ -35,17 +35,53 @@ export function parseCSV(text: string, delim: string): string[][] {
   return rows.filter((r) => r.some((c) => String(c).trim() !== ""));
 }
 
+/**
+ * Candidatos por campo, do mais específico para o mais genérico. A busca é feita em
+ * duas passadas: primeiro nome exato, depois "contém". Os primeiros nomes de cada
+ * lista são os cabeçalhos reais dos relatórios da Shopee, do Mercado Livre e do
+ * TikTok Shop — por isso vêm na frente.
+ */
 const GUESS: Record<string, string[]> = {
-  pedido: ["pedido", "order", "n. do pedido", "numero do pedido", "id do pedido", "order id", "order sn", "codigo do pedido", "venda"],
-  produto: ["produto", "item", "nome do produto", "product", "descricao", "anuncio", "titulo"],
-  sku: ["sku", "variacao", "variation", "modelo", "referencia", "cor/tamanho"],
-  valor: ["valor", "total", "preco", "price", "amount", "valor do produto", "subtotal", "receita"],
-  motivo: ["motivo", "reason", "razao", "motivo da devolucao", "tipo de solicitacao"],
-  aprovadaEm: ["data", "data da solicitacao", "data de criacao", "criado em", "solicitado em", "data devolucao", "return date", "create time", "data de aprovacao"],
-  rastreio: ["rastreio", "rastreamento", "tracking", "codigo de rastreio", "awb", "etiqueta", "tracking number"],
-  ultimoEventoEm: ["ultima atualizacao", "atualizado em", "update time", "ultimo evento", "data de atualizacao"],
-  comprador: ["comprador", "cliente", "buyer", "username", "destinatario"],
-  statusPlataforma: ["status", "situacao", "estado", "status da devolucao", "return status"],
+  pedido: [
+    "id do pedido", "n. do pedido", "numero do pedido", "order id", "order sn",
+    "codigo do pedido", "numero de venda", "venda", "pedido", "order",
+  ],
+  produto: [
+    "nome do produto", "nome do anuncio", "product name", "titulo do anuncio",
+    "produto", "anuncio", "descricao", "item", "product", "titulo",
+  ],
+  sku: [
+    "numero de referencia sku", "n. de referencia sku", "codigo sku", "sku do vendedor",
+    "seller sku", "nome da variacao", "variacao", "sku", "variation", "referencia",
+  ],
+  valor: [
+    "subtotal do produto", "preco acordado", "valor total", "total do pedido",
+    "receita", "valor do produto", "subtotal", "preco", "valor", "total", "price", "amount",
+  ],
+  motivo: [
+    "cancelar motivo", "motivo do cancelamento", "motivo da devolucao", "motivo do reembolso",
+    "reason", "tipo de solicitacao", "motivo", "razao",
+  ],
+  aprovadaEm: [
+    "data da solicitacao", "data de criacao do pedido", "data da finalizacao do cancelamento",
+    "data de criacao", "solicitado em", "criado em", "data devolucao", "return date",
+    "create time", "data de aprovacao", "data",
+  ],
+  rastreio: [
+    "numero de rastreamento", "codigo de rastreio", "tracking number", "rastreamento",
+    "rastreio", "tracking", "awb", "etiqueta",
+  ],
+  ultimoEventoEm: [
+    "ultima atualizacao", "data de atualizacao", "atualizado em", "update time", "ultimo evento",
+  ],
+  comprador: [
+    "nome de usuario (comprador)", "nome do destinatario", "comprador", "cliente",
+    "buyer", "username", "destinatario",
+  ],
+  statusPlataforma: [
+    "status da devolucao / reembolso", "status da devolucao", "status do pedido",
+    "return status", "situacao", "status", "estado",
+  ],
 };
 
 export const slug = (s: string) =>
