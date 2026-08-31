@@ -51,36 +51,42 @@ const GUESS: Record<string, string[]> = {
     "produto", "anuncio", "descricao", "item", "product", "titulo",
   ],
   sku: [
-    "numero de referencia sku", "n. de referencia sku", "codigo sku", "sku do vendedor",
-    "seller sku", "nome da variacao", "variacao", "sku", "variation", "referencia",
+    "sku da variacao", "numero de referencia sku", "n. de referencia sku", "codigo sku",
+    "sku do vendedor", "seller sku", "sku principal", "nome da variacao", "variacao",
+    "sku", "variation", "referencia",
   ],
   valor: [
-    "subtotal do produto", "preco acordado", "valor total", "total do pedido",
-    "receita", "valor do produto", "subtotal", "preco", "valor", "total", "price", "amount",
+    "quantia total de reembolsos", "preco da unidade", "subtotal do produto",
+    "preco acordado", "valor total", "total do pedido", "receita", "valor do produto",
+    "subtotal", "preco", "valor", "total", "price", "amount",
   ],
   motivo: [
     "cancelar motivo", "motivo do cancelamento", "motivo da devolucao", "motivo do reembolso",
     "reason", "tipo de solicitacao", "motivo", "razao",
   ],
   aprovadaEm: [
-    "data da solicitacao", "data de criacao do pedido", "data da finalizacao do cancelamento",
-    "data de criacao", "solicitado em", "criado em", "data devolucao", "return date",
-    "create time", "data de aprovacao", "data",
+    "tempo de envio de devolucao", "data da solicitacao", "data da devolucao",
+    "data de criacao do pedido", "data da finalizacao do cancelamento", "data de criacao",
+    "solicitado em", "criado em", "data devolucao", "return date", "create time",
+    "data de aprovacao", "data",
   ],
   rastreio: [
-    "numero de rastreamento", "codigo de rastreio", "tracking number", "rastreamento",
-    "rastreio", "tracking", "awb", "etiqueta",
+    "numero de rastreamento de devolucao", "codigo de rastreio reverso",
+    "rastreio de devolucao", "numero de rastreamento", "codigo de rastreio",
+    "tracking number", "rastreamento", "rastreio", "tracking", "awb", "etiqueta",
   ],
   ultimoEventoEm: [
-    "ultima atualizacao", "data de atualizacao", "atualizado em", "update time", "ultimo evento",
+    "tempo de entrega de devolucao concluida", "tempo decorrido de reemboslo",
+    "ultima atualizacao", "data de atualizacao", "atualizado em", "update time",
+    "ultimo evento",
   ],
   comprador: [
     "nome de usuario (comprador)", "nome do destinatario", "comprador", "cliente",
     "buyer", "username", "destinatario",
   ],
   statusPlataforma: [
-    "status da devolucao / reembolso", "status da devolucao", "status do pedido",
-    "return status", "situacao", "status", "estado",
+    "status da devolucao / reembolso", "status de rastreamento de devolucao",
+    "status da devolucao", "status do pedido", "return status", "situacao", "status", "estado",
   ],
 };
 
@@ -89,17 +95,26 @@ export const slug = (s: string) =>
 
 export function autoMap(headers: string[]): Record<string, number> {
   const m: Record<string, number> = {};
+  const slugs = headers.map(slug);
+
   for (const f of CAMPOS) {
     const cands = GUESS[f.k] || [];
-    let exact = -1;
-    for (let i = 0; i < headers.length; i++) {
-      if (cands.includes(slug(headers[i]))) { exact = i; break; }
+
+    // A ordem dos candidatos é a prioridade: percorremos os candidatos, não as colunas.
+    // Sem isso, uma coluna genérica que aparece antes na planilha (por exemplo
+    // "SKU principal") venceria a específica que queremos ("SKU da Variação").
+    let achou = -1;
+    for (const c of cands) {
+      const i = slugs.indexOf(c);
+      if (i > -1) { achou = i; break; }
     }
-    if (exact > -1) { m[f.k] = exact; continue; }
-    for (let i = 0; i < headers.length; i++) {
-      const h = slug(headers[i]);
-      if (cands.some((c) => h.includes(c))) { if (m[f.k] === undefined) m[f.k] = i; }
+    if (achou === -1) {
+      for (const c of cands) {
+        const i = slugs.findIndex((h) => h.includes(c));
+        if (i > -1) { achou = i; break; }
+      }
     }
+    if (achou > -1) m[f.k] = achou;
   }
   return m;
 }

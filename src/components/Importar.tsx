@@ -16,6 +16,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
   const [tabela, setTabela] = useState<string[][] | null>(null);
   const [map, setMap] = useState<Record<string, number>>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const [nomeArquivo, setNomeArquivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -77,13 +78,21 @@ export default function Importar({ rows, maps, onImportado }: Props) {
 
     // Aviso: relatório de pedidos CANCELADOS não é relatório de devolução. Cancelamento
     // acontece antes do envio — não existe pacote voltando para conferir.
+    // O relatório de "falha na entrega" também vem com status Cancelado, mas ele É uma
+    // devolução (o pacote está voltando). Por isso o nome do arquivo manda: só avisamos
+    // quando ele identifica o relatório de cancelamentos.
+    const nome = nomeArquivo.toLowerCase();
+    const arquivoDeDevolucao = /return|refund|devolu|failed_delivery|falha/.test(nome);
+    const arquivoDeCancelamento = /cancel/.test(nome) && !arquivoDeDevolucao;
     const cancelados = novas.filter((r) =>
       /cancelad/i.test(String(r.statusPlataforma || "") + " " + String(r.motivo || ""))
     ).length;
-    const pareceCancelamento = novas.length >= 5 && cancelados / novas.length > 0.6;
+    const pareceCancelamento =
+      arquivoDeCancelamento ||
+      (!arquivoDeDevolucao && novas.length >= 5 && cancelados / novas.length > 0.6);
 
     return { novas, dup, semPedido, pareceCancelamento };
-  }, [tabela, map, rows, canal]);
+  }, [tabela, map, rows, canal, nomeArquivo]);
 
   async function importar() {
     if (!tabela || map.pedido === undefined) return;
@@ -143,7 +152,14 @@ export default function Importar({ rows, maps, onImportado }: Props) {
               const f = e.target.files?.[0];
               if (!f) return;
               setMsg(null);
-              if (/\.xlsx$/i.test(f.name)) {
+              setNomeArquivo(f.name);
+              // A Shopee entrega o relatório de devoluções com extensão .xls mas o
+              // conteúdo é .xlsx. Por isso decidimos pelo conteúdo (assinatura "PK"),
+              // nunca pelo nome do arquivo.
+              f.slice(0, 4).arrayBuffer().then((buf) => {
+                const b = new Uint8Array(buf);
+                const ehZip = b[0] === 0x50 && b[1] === 0x4b; // "PK"
+                if (ehZip) {
                 setMsg("Lendo a planilha…");
                 import("read-excel-file/browser")
                   .then((m) => m.default(f))
@@ -175,16 +191,18 @@ export default function Importar({ rows, maps, onImportado }: Props) {
                     setMap(salvo ? mapFromNames(salvo, uteis[0]) : autoMap(uteis[0]));
                     setMsg(null);
                   })
-                  .catch(() => setMsg("Não consegui abrir essa planilha. Confira se o arquivo é .xlsx."));
-                return;
-              }
-              if (/\.xls$/i.test(f.name)) {
-                setMsg("Esse é um Excel antigo (.xls). Abra no Excel e salve como .xlsx ou CSV.");
-                return;
-              }
-              const fr = new FileReader();
-              fr.onload = () => { const t = String(fr.result || ""); setRaw(t); analisar(t); };
-              fr.readAsText(f, "utf-8");
+                  .catch(() =>
+                    setMsg(
+                      "Não consegui abrir essa planilha. Se ela veio dentro de um .zip, " +
+                      "descompacte primeiro e escolha a planilha de dentro."
+                    )
+                  );
+                  return;
+                }
+                const fr = new FileReader();
+                fr.onload = () => { const t = String(fr.result || ""); setRaw(t); analisar(t); };
+                fr.readAsText(f, "utf-8");
+              });
             }} />
           </div>
         </div>
@@ -194,7 +212,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
 
         <div className="row" style={{ marginTop: ".8rem" }}>
           <button className="primary" onClick={() => analisar()}>Analisar colunas</button>
-          <button onClick={() => { setRaw(""); setTabela(null); setMsg(null); if (fileRef.current) fileRef.current.value = ""; }}>
+          <button onClick={() => { setRaw(""); setTabela(null); setMsg(null); setNomeArquivo(""); if (fileRef.current) fileRef.current.value = ""; }}>
             Limpar
           </button>
         </div>
