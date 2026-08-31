@@ -6,7 +6,14 @@ let cached: Firestore | null = null;
 export function db(): Firestore {
   if (cached) return cached;
 
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  // A credencial pode vir em uma variável só (FIREBASE_SERVICE_ACCOUNT) ou, quando o
+  // painel não aceita um valor tão longo de uma vez, partida em duas:
+  // FIREBASE_SERVICE_ACCOUNT_1 + FIREBASE_SERVICE_ACCOUNT_2 (concatenadas nesta ordem).
+  const raw =
+    process.env.FIREBASE_SERVICE_ACCOUNT ||
+    [process.env.FIREBASE_SERVICE_ACCOUNT_1, process.env.FIREBASE_SERVICE_ACCOUNT_2]
+      .filter(Boolean)
+      .join("");
   if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT não está configurada nas variáveis de ambiente.");
 
   let parsed: ServiceAccount & { private_key?: string };
