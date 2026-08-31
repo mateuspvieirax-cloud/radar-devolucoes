@@ -14,7 +14,11 @@ export function db(): Firestore {
     const json = raw.trim().startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8");
     parsed = JSON.parse(json);
   } catch {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT não é um JSON válido.");
+    const n = raw.trim().length;
+    throw new Error(
+      `FIREBASE_SERVICE_ACCOUNT não é um JSON válido (o valor salvo tem ${n} caracteres; ` +
+      `o esperado são 2720). Reveja a variável nas configurações da Vercel.`
+    );
   }
   if (parsed.private_key) parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
 
