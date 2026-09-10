@@ -125,20 +125,21 @@ export default function RadarApp({
   /* ---------- derivados ---------- */
   const abertas = useMemo(() => rows.filter((r) => r.estado === "esperando"), [rows]);
   const grupos = useMemo(() => {
-    const g = { contestar: [] as Devolucao[], extravio: [] as Devolucao[], cobrar: [] as Devolucao[], risco: [] as Devolucao[] };
+    const g = { contestar: [] as Devolucao[], chegou: [] as Devolucao[], extravio: [] as Devolucao[], cobrar: [] as Devolucao[], risco: [] as Devolucao[] };
     for (const r of rows) {
       const s = situacao(r, cfg);
       if (!s.acao) continue;
       if (s.acao.tipo === "contestar") g.contestar.push(r);
+      else if (s.acao.tipo === "bipar") g.chegou.push(r);
       else if (s.acao.tipo === "chamado") g.extravio.push(r);
       else if (s.acao.tipo === "cobrar") g.cobrar.push(r);
       else g.risco.push(r);
     }
     const byDias = (a: Devolucao, b: Devolucao) => parado(b) - parado(a);
-    g.extravio.sort(byDias); g.risco.sort(byDias);
+    g.extravio.sort(byDias); g.risco.sort(byDias); g.chegou.sort(byDias);
     return g;
   }, [rows, cfg]);
-  const totalAcoes = grupos.contestar.length + grupos.extravio.length + grupos.cobrar.length + grupos.risco.length;
+  const totalAcoes = grupos.contestar.length + grupos.chegou.length + grupos.extravio.length + grupos.cobrar.length + grupos.risco.length;
 
   const onDetalhe = (r: Devolucao) => setModal({ t: "detalhe", row: r });
 
@@ -167,6 +168,7 @@ export default function RadarApp({
   const Tiles = (() => {
     const risco = abertas.filter((r) => situacao(r, cfg).k === "risco");
     const extr = abertas.filter((r) => situacao(r, cfg).k === "extravio");
+    const cheg = abertas.filter((r) => situacao(r, cfg).k === "chegou");
     const cham = rows.filter((r) => r.estado === "chamado");
     const cont = rows.filter((r) => situacao(r, cfg).k === "contestar");
     const inde = rows.filter((r) => r.estado === "indenizada" && dentroDe30(r.indenizadaEm));
@@ -175,6 +177,7 @@ export default function RadarApp({
       <div className="tiles">
         <Tile lab="Esperando" big={String(abertas.length)} sm={brlShort(soma(abertas))} cls="acc" />
         <Tile lab="Contestar" big={String(cont.length)} sm={brlShort(soma(cont))} cls={cont.length ? "crit" : ""} />
+        <Tile lab="Entregue, falta bipar" big={String(cheg.length)} sm={brlShort(soma(cheg))} cls={cheg.length ? "warn" : ""} />
         <Tile lab="Em risco" big={String(risco.length)} sm={brlShort(soma(risco))} cls={risco.length ? "warn" : ""} />
         <Tile lab="Provável extravio" big={String(extr.length)} sm={brlShort(soma(extr))} cls={extr.length ? "crit" : ""} />
         <Tile lab="Chamados abertos" big={String(cham.length)} sm={brlShort(soma(cham))} cls={cham.length ? "warn" : ""} />
@@ -208,6 +211,12 @@ export default function RadarApp({
         <Grupo cls="crit" titulo="Contestar hoje" cfg={cfg} rows={grupos.contestar} onDetalhe={onDetalhe}
           porque="Peça conferida com divergência. A janela de contestação é a mais curta que existe."
           acoes={(r) => [{ l: "Marcar contestada", primary: true, fn: () => marcarContestada(r) }]} />
+        <Grupo cls="warn" titulo="Entregue pelo canal — procurar e bipar" cfg={cfg} rows={grupos.chegou} onDetalhe={onDetalhe}
+          porque="O painel do canal já marcou a devolução como entregue, mas ninguém bipou a caixa aqui. Procure primeiro: pode estar no galpão sem baixa. Se não achar, aí sim é chamado — e o próprio painel dizendo ‘entregue’ vira a sua prova."
+          acoes={(r) => [
+            { l: "Achei / conferir", primary: true, fn: () => setModal({ t: "conferencia", row: r }) },
+            { l: "Não achei — chamado", fn: () => setModal({ t: "chamado", row: r }) },
+          ]} />
         <Grupo cls="crit" titulo="Abrir chamado de extravio" cfg={cfg} rows={grupos.extravio} onDetalhe={onDetalhe}
           porque="Rastreio reverso parado além do limite do canal. Não espere a plataforma reconhecer — ela não reconhece sozinha."
           acoes={acoesExtravio} />

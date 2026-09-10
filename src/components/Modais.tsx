@@ -154,7 +154,7 @@ export function Detalhe({
     ["SKU", row.sku || "—"], ["Valor", brl(row.valor)], ["Motivo declarado", row.motivo || "—"],
     ["Comprador", row.comprador || "—"],
     ["Data da devolução", fmtDate(row.aprovadaEm)], ["Rastreio reverso", row.rastreio || "—"],
-    ["Último evento", row.ultimoEventoEm || "—"], ["Status na plataforma", row.statusPlataforma || "—"],
+    ["Último evento", row.ultimoEventoEm || "—"], ["Entregue pelo canal em", row.entregueEm || "—"], ["Status na plataforma", row.statusPlataforma || "—"],
     ["Situação", s.lab],
     ["Recebida em", row.recebidaEm || "—"], ["Grade", row.grade || "—"],
     ["Motivo real", row.motivoReal || "—"], ["Contestada em", row.contestadaEm || "—"],

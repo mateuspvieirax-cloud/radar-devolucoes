@@ -16,6 +16,7 @@ export interface Devolucao {
   aprovadaEm: string;           // YYYY-MM-DD
   rastreio?: string;
   ultimoEventoEm?: string | null;
+  entregueEm?: string | null;   // data em que a plataforma marcou a devolucao como entregue
   estado: Estado;
   recebidaEm?: string | null;
   divergente?: boolean;
@@ -52,6 +53,7 @@ export const CAMPOS = [
   { k: "aprovadaEm",     l: "Data da devolução",          req: true },
   { k: "rastreio",       l: "Rastreio reverso",           req: false },
   { k: "ultimoEventoEm", l: "Último evento do rastreio",  req: false },
+  { k: "entregueEm",     l: "Devolução entregue em",      req: false },
   { k: "comprador",      l: "Comprador",                  req: false },
   { k: "statusPlataforma", l: "Status na plataforma",     req: false },
 ] as const;

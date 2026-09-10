@@ -70,9 +70,9 @@ export function parado(r: Devolucao, hoje?: string): number {
   return d === null ? 0 : d;
 }
 
-export type AcaoTipo = "contestar" | "chamado" | "cobrar" | "rastreio";
+export type AcaoTipo = "contestar" | "chamado" | "cobrar" | "rastreio" | "bipar";
 export interface Situacao {
-  k: "esperando" | "risco" | "extravio" | "contestar" | "recebida" | "chamado" | "indenizada" | "perda";
+  k: "esperando" | "risco" | "extravio" | "contestar" | "recebida" | "chamado" | "indenizada" | "perda" | "chegou";
   lab: string;
   cls: string;
   acao: { tipo: AcaoTipo; prio: number } | null;
@@ -100,6 +100,15 @@ export function situacao(r: Devolucao, cfg: Config, hoje?: string): Situacao {
     if (r.divergente && !r.contestadaEm)
       return { k: "contestar", lab: "contestar", cls: "divergente", acao: { tipo: "contestar", prio: 1 } };
     return { k: "recebida", lab: r.divergente ? "contestada" : "conferida", cls: "recebida", acao: null };
+  }
+
+  // A plataforma ja marcou a devolucao como entregue, mas ninguem bipou a caixa.
+  // Isso NAO e extravio ainda: e uma caixa para procurar no galpao antes de abrir
+  // chamado. So depois de procurar e nao achar e que vira extravio - e ai com uma
+  // prova a mais na mao: o painel do canal dizendo que entregou.
+  if (r.entregueEm) {
+    const de = daysBetween(r.entregueEm, hoje) ?? 0;
+    return { k: "chegou", lab: "entregue \u2014 falta bipar", cls: "chegou", acao: { tipo: "bipar", prio: 1 }, dias: de };
   }
 
   if (d >= c.extravio)

@@ -38,7 +38,7 @@ export function Tabela({
           {rows.map((r) => {
             const s = situacao(r, cfg);
             const d = parado(r);
-            const dcls = s.k === "extravio" ? "crit" : s.k === "risco" ? "warn" : "";
+            const dcls = s.k === "extravio" ? "crit" : s.k === "risco" || s.k === "chegou" ? "warn" : "";
             return (
               <tr key={r.id}>
                 <td><span className="pill canal">{r.canal.split(" ")[0]}</span></td>

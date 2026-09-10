@@ -11,7 +11,7 @@ export const maxDuration = 60;
 interface Entrada {
   pedido?: string; produto?: string; sku?: string; valor?: string;
   motivo?: string; aprovadaEm?: string; rastreio?: string;
-  ultimoEventoEm?: string; comprador?: string; statusPlataforma?: string;
+  ultimoEventoEm?: string; entregueEm?: string; comprador?: string; statusPlataforma?: string;
 }
 
 export async function POST(req: Request) {
@@ -45,6 +45,7 @@ export async function POST(req: Request) {
         aprovadaEm: parseDate(l.aprovadaEm) || todayISO(),
         rastreio: String(l.rastreio || "").trim(),
         ultimoEventoEm: parseDate(l.ultimoEventoEm),
+        entregueEm: parseDate(l.entregueEm),
         comprador: String(l.comprador || "").trim(),
         statusPlataforma: String(l.statusPlataforma || "").trim(),
         estado: "esperando",
@@ -74,13 +75,16 @@ export async function POST(req: Request) {
       await batch.commit();
     }
 
-    const atualizaveis = candidatos.filter((c) => existentes.has(c.id) && (c.rastreio || c.ultimoEventoEm));
+    const atualizaveis = candidatos.filter(
+      (c) => existentes.has(c.id) && (c.rastreio || c.ultimoEventoEm || c.entregueEm)
+    );
     for (let i = 0; i < atualizaveis.length; i += 400) {
       const batch = firestore.batch();
       for (const c of atualizaveis.slice(i, i + 400)) {
         const patch: Record<string, unknown> = {};
         if (c.rastreio) patch.rastreio = c.rastreio;
         if (c.ultimoEventoEm) patch.ultimoEventoEm = c.ultimoEventoEm;
+        if (c.entregueEm) patch.entregueEm = c.entregueEm;
         if (Object.keys(patch).length) batch.set(col.doc(c.id), patch, { merge: true });
       }
       await batch.commit();

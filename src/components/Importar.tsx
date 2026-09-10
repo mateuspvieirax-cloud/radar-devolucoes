@@ -70,6 +70,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
         valor: parseMoney(g("valor")), motivo: g("motivo"),
         aprovadaEm: parseDate(g("aprovadaEm")) || todayISO(),
         rastreio: g("rastreio"), ultimoEventoEm: parseDate(g("ultimoEventoEm")),
+        entregueEm: parseDate(g("entregueEm")),
         comprador: g("comprador"), statusPlataforma: g("statusPlataforma"),
       };
       vistos.set(id, nova);

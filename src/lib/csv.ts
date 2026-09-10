@@ -80,6 +80,11 @@ const GUESS: Record<string, string[]> = {
     "ultima atualizacao", "data de atualizacao", "atualizado em", "update time",
     "ultimo evento",
   ],
+  entregueEm: [
+    "tempo de entrega de devolucao concluida", "data de entrega da devolucao",
+    "devolucao entregue em", "data de recebimento da devolucao",
+    "return delivered time", "data de entrega reversa",
+  ],
   comprador: [
     "nome de usuario (comprador)", "nome do destinatario", "comprador", "cliente",
     "buyer", "username", "destinatario",

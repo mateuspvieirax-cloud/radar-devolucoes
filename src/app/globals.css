@@ -124,6 +124,7 @@ td.acts button{margin-left:.25rem}
 .pill.risco{color:var(--warn);background:var(--warn-soft)}
 .pill.extravio{color:var(--crit);background:var(--crit-soft)}
 .pill.recebida{color:var(--accent);background:var(--accent-soft)}
+.pill.chegou{color:var(--good);background:var(--good-soft)}
 .pill.divergente{color:var(--crit);background:var(--crit-soft)}
 .pill.chamado{color:var(--warn);background:var(--warn-soft)}
 .pill.indenizada{color:var(--good);background:var(--good-soft)}
