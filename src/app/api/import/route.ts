@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COL, db } from "@/lib/firebase-admin";
+import { bumpRev, COL, db } from "@/lib/firebase-admin";
 import { docId, parseDate, parseMoney, todayISO } from "@/lib/domain";
 import { pedidoPlausivel } from "@/lib/csv";
 import { CANAIS, type Canal, type Devolucao } from "@/lib/types";
@@ -89,6 +89,8 @@ export async function POST(req: Request) {
       }
       await batch.commit();
     }
+
+    await bumpRev();
 
     return NextResponse.json({
       importadas: novas.length,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { APP_DOC } from "@/lib/firebase-admin";
+import { APP_DOC, bumpRev } from "@/lib/firebase-admin";
 import type { Mappings } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ export async function PUT(req: Request) {
       { maps: { [canal]: nomes }, updatedAt: new Date().toISOString() },
       { merge: true }
     );
+    await bumpRev();
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ erro: (e as Error).message }, { status: 500 });

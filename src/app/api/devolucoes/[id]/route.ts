@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { COL, db } from "@/lib/firebase-admin";
+import { bumpRev, COL, db } from "@/lib/firebase-admin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +28,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     await ref.set(patch, { merge: true });
     const novo = await ref.get();
-    return NextResponse.json({ row: { id: novo.id, ...novo.data() } });
+    const rev = await bumpRev();
+    return NextResponse.json({ row: { id: novo.id, ...novo.data() }, rev });
   } catch (e) {
     return NextResponse.json({ erro: (e as Error).message }, { status: 500 });
   }

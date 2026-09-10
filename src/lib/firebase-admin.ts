@@ -37,3 +37,20 @@ export function db(): Firestore {
 
 export const COL = "devolucoes";
 export const APP_DOC = (name: string) => db().collection("app").doc(name);
+
+/**
+ * Carimbo da última alteração na base. Existe para a tela poder perguntar "mudou
+ * alguma coisa?" com UMA leitura, em vez de reler a coleção inteira a cada 30
+ * segundos — que é o que estourava a cota gratuita do Firestore em uma hora de aba
+ * aberta.
+ */
+export async function bumpRev(): Promise<number> {
+  const rev = Date.now();
+  try { await APP_DOC("estado").set({ rev }, { merge: true }); } catch { /* nao bloqueia a escrita principal */ }
+  return rev;
+}
+
+export async function lerRev(): Promise<number> {
+  const snap = await APP_DOC("estado").get();
+  return Number(snap.data()?.rev) || 0;
+}

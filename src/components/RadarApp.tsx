@@ -17,6 +17,23 @@ type Modal =
   | { t: "detalhe"; row: Devolucao }
   | null;
 
+/**
+ * A cota gratuita do Firestore é de 50 mil leituras por dia. Ler a coleção inteira a
+ * cada 30 segundos com algumas centenas de devoluções queima isso em cerca de uma
+ * hora de aba aberta — por isso a tela agora pergunta primeiro "mudou alguma coisa?"
+ * (1 leitura) e só busca a lista quando mudou.
+ */
+function mensagemDeErro(msg: string): string {
+  if (/RESOURCE_EXHAUSTED|Quota exceeded/i.test(msg)) {
+    return (
+      "A cota diária gratuita do banco acabou por hoje. Nenhum dado foi perdido — " +
+      "a lista volta sozinha quando a cota renova, à meia-noite no horário do Pacífico " +
+      "(por volta das 4h da manhã aqui)."
+    );
+  }
+  return msg;
+}
+
 export default function RadarApp({
   initialRows, initialCfg, initialMaps, erroInicial,
 }: {
@@ -27,12 +44,13 @@ export default function RadarApp({
   const [maps, setMaps] = useState<Mappings>(initialMaps);
   const [aba, setAba] = useState<Aba>("radar");
   const [modal, setModal] = useState<Modal>(null);
-  const [erro, setErro] = useState<string | null>(erroInicial);
+  const [erro, setErro] = useState<string | null>(erroInicial ? mensagemDeErro(erroInicial) : null);
   const [sync, setSync] = useState<{ estado: "ok" | "carregando" | "erro"; msg: string }>({
     estado: "ok", msg: "atualizado agora",
   });
   const [scanMsg, setScanMsg] = useState<{ txt: string; ok: boolean } | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
+  const revRef = useRef<number>(0);
 
   const recarregar = useCallback(async (silencioso = true) => {
     if (!silencioso) setSync({ estado: "carregando", msg: "atualizando…" });
@@ -41,20 +59,34 @@ export default function RadarApp({
       const data = await res.json();
       if (!res.ok) throw new Error(data.erro || "falha ao carregar");
       setRows(data.rows as Devolucao[]);
+      if (typeof data.rev === "number") revRef.current = data.rev;
       setErro(null);
       setSync({ estado: "ok", msg: "atualizado " + new Date().toLocaleTimeString("pt-BR").slice(0, 5) });
     } catch (e) {
+      // Falha de leitura não apaga o que já está na tela: sumir dado é pior que dado velho.
       setSync({ estado: "erro", msg: "sem conexão com o banco" });
-      if (!silencioso) setErro((e as Error).message);
+      setErro(mensagemDeErro((e as Error).message));
     }
   }, []);
 
-  useEffect(() => {
-    const id = setInterval(() => recarregar(true), 30000);
-    const onFocus = () => recarregar(true);
-    window.addEventListener("focus", onFocus);
-    return () => { clearInterval(id); window.removeEventListener("focus", onFocus); };
+  // Consulta barata: 1 leitura só para saber se alguém mexeu na base.
+  const verificar = useCallback(async () => {
+    try {
+      const res = await fetch("/api/rev", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.erro || "falha ao verificar");
+      if (typeof data.rev === "number" && data.rev !== revRef.current) await recarregar(true);
+    } catch (e) {
+      setSync({ estado: "erro", msg: "sem conexão com o banco" });
+      setErro(mensagemDeErro((e as Error).message));
+    }
   }, [recarregar]);
+
+  useEffect(() => {
+    const id = setInterval(verificar, 30000);
+    window.addEventListener("focus", verificar);
+    return () => { clearInterval(id); window.removeEventListener("focus", verificar); };
+  }, [verificar]);
 
   const patch = useCallback(async (id: string, campos: Partial<Devolucao>) => {
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...campos } : r)));
@@ -67,6 +99,7 @@ export default function RadarApp({
       const data = await res.json();
       if (!res.ok) throw new Error(data.erro || "falha ao salvar");
       setRows((rs) => rs.map((r) => (r.id === id ? (data.row as Devolucao) : r)));
+      if (typeof data.rev === "number") revRef.current = data.rev;
       setSync({ estado: "ok", msg: "salvo " + new Date().toLocaleTimeString("pt-BR").slice(0, 5) });
     } catch (e) {
       setErro("Não deu para salvar: " + (e as Error).message + " — recarregue a página.");
@@ -374,7 +407,7 @@ export default function RadarApp({
       </main>
 
       <footer className="foot">
-        {rows.length} devoluções na base · dados no Firestore, atualizados a cada 30 segundos
+        {rows.length} devoluções na base · dados no Firestore, verificados a cada 30 segundos
       </footer>
 
       {modal?.t === "conferencia" && (

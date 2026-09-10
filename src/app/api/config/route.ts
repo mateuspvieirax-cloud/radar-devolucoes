@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { APP_DOC } from "@/lib/firebase-admin";
+import { APP_DOC, bumpRev } from "@/lib/firebase-admin";
 import { DEFAULT_CONFIG, type Config } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,7 @@ export async function PUT(req: Request) {
       };
     }
     await APP_DOC("config").set({ canais: limpo, updatedAt: new Date().toISOString() }, { merge: true });
+    await bumpRev();
     return NextResponse.json({ cfg: limpo });
   } catch (e) {
     return NextResponse.json({ erro: (e as Error).message }, { status: 500 });
