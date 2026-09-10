@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useRef, useState } from "react";
-import { autoMap, detectDelim, mapFromNames, pareceBinario, parseCSV, pedidoPlausivel } from "@/lib/csv";
+import { acharCabecalho, autoMap, detectDelim, mapFromNames, pareceBinario, parseCSV, pedidoPlausivel } from "@/lib/csv";
 import { brl, docId, parseDate, parseMoney, todayISO } from "@/lib/domain";
 import { CAMPOS, CANAIS, type Canal, type Devolucao, type Mappings } from "@/lib/types";
 
@@ -40,9 +40,10 @@ export default function Importar({ rows, maps, onImportado }: Props) {
       setTabela(null);
       return;
     }
-    setTabela(linhas);
+    const tab = linhas.slice(acharCabecalho(linhas));
+    setTabela(tab);
     const salvo = maps[canal];
-    setMap(salvo ? mapFromNames(salvo, linhas[0]) : autoMap(linhas[0]));
+    setMap(salvo ? mapFromNames(salvo, tab[0]) : autoMap(tab[0]));
   }
 
   const previa = useMemo(() => {
@@ -122,7 +123,10 @@ export default function Importar({ rows, maps, onImportado }: Props) {
 
       setRaw(""); setTabela(null); setMap({});
       if (fileRef.current) fileRef.current.value = "";
-      setMsg(`${data.importadas} devolução(ões) importada(s). ${data.duplicadas} já estavam na lista.`);
+      const partes = [`${data.importadas} devolução(ões) nova(s)`];
+      if (data.atualizadas) partes.push(`${data.atualizadas} já na lista tiveram rastreio e datas atualizados`);
+      else if (data.duplicadas) partes.push(`${data.duplicadas} já estavam na lista`);
+      setMsg(partes.join(" · ") + ".");
     } catch (e) {
       setMsg("Erro: " + (e as Error).message);
     } finally {
@@ -186,10 +190,11 @@ export default function Importar({ rows, maps, onImportado }: Props) {
                       setTabela(null);
                       return;
                     }
+                    const tab = uteis.slice(acharCabecalho(uteis));
                     setRaw("");
-                    setTabela(uteis);
+                    setTabela(tab);
                     const salvo = maps[canal];
-                    setMap(salvo ? mapFromNames(salvo, uteis[0]) : autoMap(uteis[0]));
+                    setMap(salvo ? mapFromNames(salvo, tab[0]) : autoMap(tab[0]));
                     setMsg(null);
                   })
                   .catch(() =>
@@ -269,7 +274,7 @@ export default function Importar({ rows, maps, onImportado }: Props) {
                 )}
                 <div className="preview">
                   Novas devoluções a importar: <b>{previa.novas.length}</b><br />
-                  Já estavam na lista (ignoradas): {previa.dup}<br />
+                  Já estavam na lista (serão atualizadas): {previa.dup}<br />
                   {previa.semPedido > 0 && <><span className="bad">Linhas descartadas (sem número de pedido válido): {previa.semPedido}</span><br /></>}
                   Valor total das novas: <b>{brl(previa.novas.reduce((a, r) => a + (r.valor || 0), 0))}</b>
                 </div>
@@ -284,10 +289,17 @@ export default function Importar({ rows, maps, onImportado }: Props) {
                   </div>
                 )}
                 <div className="row" style={{ marginTop: ".9rem" }}>
-                  <button className="primary" onClick={importar} disabled={enviando || !previa.novas.length}>
-                    {enviando ? "Importando…" : `Importar ${previa.novas.length} devoluções`}
+                  <button className="primary" onClick={importar}
+                    disabled={enviando || (!previa.novas.length && !previa.dup)}>
+                    {enviando
+                      ? "Importando…"
+                      : previa.novas.length
+                        ? `Importar ${previa.novas.length} devoluções`
+                        : `Atualizar ${previa.dup} devoluções já na lista`}
                   </button>
-                  <span className="syncmsg">o mapeamento fica salvo para {canal}</span>
+                  <span className="syncmsg">
+                    reimportar o mesmo relatório não duplica nada: atualiza rastreio e datas
+                  </span>
                 </div>
               </>
             )}

@@ -124,6 +124,30 @@ export function autoMap(headers: string[]): Record<string, number> {
   return m;
 }
 
+/**
+ * Alguns relatorios (o do Mercado Livre, por exemplo) trazem uma ou duas linhas de
+ * titulo antes do cabecalho de verdade. Se tratarmos a primeira linha como cabecalho,
+ * o "pedido" vira o texto do titulo e entra lixo na base. Aqui procuramos, nas
+ * primeiras linhas, aquela que mais parece um cabecalho de devolucoes.
+ */
+export function acharCabecalho(grade: string[][]): number {
+  const limite = Math.min(grade.length, 12);
+  let melhor = 0;
+  let melhorNota = -1;
+  for (let i = 0; i < limite; i++) {
+    const linha = (grade[i] || []).map((c) => String(c ?? ""));
+    if (linha.filter((c) => c.trim() !== "").length < 2) continue;
+    const m = autoMap(linha);
+    // Pedido e data pesam mais: sem elas a linha nao e cabecalho de devolucao.
+    const nota =
+      Object.keys(m).length +
+      (m.pedido !== undefined ? 3 : 0) +
+      (m.aprovadaEm !== undefined ? 2 : 0);
+    if (nota > melhorNota) { melhorNota = nota; melhor = i; }
+  }
+  return melhorNota >= 5 ? melhor : 0;
+}
+
 export function mapFromNames(names: Record<string, string>, headers: string[]): Record<string, number> {
   const m: Record<string, number> = {};
   for (const k of Object.keys(names)) {
