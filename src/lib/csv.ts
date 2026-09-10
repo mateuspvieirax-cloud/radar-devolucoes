@@ -47,7 +47,7 @@ const GUESS: Record<string, string[]> = {
     "codigo do pedido", "numero de venda", "venda", "pedido", "order",
   ],
   produto: [
-    "nome do produto", "nome do anuncio", "product name", "titulo do anuncio",
+    "nome do produto", "product name", "nome do anuncio", "product name", "titulo do anuncio",
     "produto", "anuncio", "descricao", "item", "product", "titulo",
   ],
   sku: [
@@ -56,27 +56,27 @@ const GUESS: Record<string, string[]> = {
     "sku", "variation", "referencia",
   ],
   valor: [
-    "quantia total de reembolsos", "preco da unidade", "subtotal do produto",
+    "quantia total de reembolsos", "return unit price", "order amount", "preco da unidade", "subtotal do produto",
     "preco acordado", "valor total", "total do pedido", "receita", "valor do produto",
     "subtotal", "preco", "valor", "total", "price", "amount",
   ],
   motivo: [
-    "cancelar motivo", "motivo do cancelamento", "motivo da devolucao", "motivo do reembolso",
+    "return reason", "cancelar motivo", "motivo do cancelamento", "motivo da devolucao", "motivo do reembolso",
     "reason", "tipo de solicitacao", "motivo", "razao",
   ],
   aprovadaEm: [
-    "tempo de envio de devolucao", "data da solicitacao", "data da devolucao",
+    "tempo de envio de devolucao", "time requested", "data da solicitacao", "data da devolucao",
     "data de criacao do pedido", "data da finalizacao do cancelamento", "data de criacao",
     "solicitado em", "criado em", "data devolucao", "return date", "create time",
     "data de aprovacao", "data",
   ],
   rastreio: [
-    "numero de rastreamento de devolucao", "codigo de rastreio reverso",
+    "numero de rastreamento de devolucao", "return logistics tracking id", "codigo de rastreio reverso",
     "rastreio de devolucao", "numero de rastreamento", "codigo de rastreio",
     "tracking number", "rastreamento", "rastreio", "tracking", "awb", "etiqueta",
   ],
   ultimoEventoEm: [
-    "tempo de entrega de devolucao concluida", "tempo decorrido de reemboslo",
+    "tempo de entrega de devolucao concluida", "refund time", "tempo decorrido de reemboslo",
     "ultima atualizacao", "data de atualizacao", "atualizado em", "update time",
     "ultimo evento",
   ],
@@ -86,7 +86,7 @@ const GUESS: Record<string, string[]> = {
     "return delivered time", "data de entrega reversa",
   ],
   comprador: [
-    "nome de usuario (comprador)", "nome do destinatario", "comprador", "cliente",
+    "nome de usuario (comprador)", "buyer username", "nome do destinatario", "comprador", "cliente",
     "buyer", "username", "destinatario",
   ],
   statusPlataforma: [

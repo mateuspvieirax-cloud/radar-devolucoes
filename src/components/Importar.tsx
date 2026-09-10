@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo, useRef, useState } from "react";
 import { acharCabecalho, autoMap, detectDelim, mapFromNames, pareceBinario, parseCSV, pedidoPlausivel } from "@/lib/csv";
+import { lerXlsxTolerante } from "@/lib/xlsx";
 import { brl, docId, parseDate, parseMoney, todayISO } from "@/lib/domain";
 import { CAMPOS, CANAIS, type Canal, type Devolucao, type Mappings } from "@/lib/types";
 
@@ -8,6 +9,34 @@ interface Props {
   rows: Devolucao[];
   maps: Mappings;
   onImportado: (canal: Canal, nomes: Record<string, string>) => void;
+}
+
+type Planilha = { sheet?: string; data?: unknown[][] };
+
+/** A biblioteca devolve ou uma grade direta ou uma lista de abas. Normaliza os dois. */
+function paraGrade(bruto: unknown): string[][] {
+  const arr = bruto as Planilha[] | unknown[][];
+  const direta = Array.isArray(arr[0]) ? (arr as unknown[][]) : null;
+  const celulas: unknown[][] =
+    direta ??
+    ((arr as Planilha[]).find((p) => (p?.data?.length || 0) > 1)?.data ??
+      (arr as Planilha[])[0]?.data ??
+      []);
+  return celulas.map((l) =>
+    (Array.isArray(l) ? l : []).map((c) => (c === null || c === undefined ? "" : String(c).trim()))
+  );
+}
+
+async function lerPlanilha(f: File): Promise<string[][]> {
+  try {
+    const m = await import("read-excel-file/browser");
+    return paraGrade(await m.default(f));
+  } catch {
+    // Nem todo painel gera um .xlsx bem formado - o do TikTok Shop declara todas as
+    // celulas dentro da "linha 1", e a biblioteca desiste. O leitor tolerante se guia
+    // pela referencia de cada celula, entao le o arquivo assim mesmo.
+    return await lerXlsxTolerante(f);
+  }
 }
 
 export default function Importar({ rows, maps, onImportado }: Props) {
@@ -153,61 +182,45 @@ export default function Importar({ rows, maps, onImportado }: Props) {
           </div>
           <div className="fld">
             <label>Arquivo</label>
-            <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xlsx" onChange={(e) => {
+            <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" onChange={(e) => {
               const f = e.target.files?.[0];
               if (!f) return;
               setMsg(null);
               setNomeArquivo(f.name);
-              // A Shopee entrega o relatório de devoluções com extensão .xls mas o
-              // conteúdo é .xlsx. Por isso decidimos pelo conteúdo (assinatura "PK"),
+              // A Shopee entrega o relatorio de devolucoes com extensao .xls mas o
+              // conteudo e .xlsx. Por isso decidimos pelo conteudo (assinatura "PK"),
               // nunca pelo nome do arquivo.
-              f.slice(0, 4).arrayBuffer().then((buf) => {
+              f.slice(0, 4).arrayBuffer().then(async (buf) => {
                 const b = new Uint8Array(buf);
                 const ehZip = b[0] === 0x50 && b[1] === 0x4b; // "PK"
-                if (ehZip) {
-                setMsg("Lendo a planilha…");
-                import("read-excel-file/browser")
-                  .then((m) => m.default(f))
-                  .then((linhas) => {
-                    // A biblioteca devolve as planilhas do arquivo; usamos a primeira
-                    // que tenha conteúdo.
-                    type Planilha = { sheet?: string; data?: unknown[][] };
-                    const bruto = linhas as unknown as Planilha[] | unknown[][];
-                    const primeira = Array.isArray(bruto[0]) ? (bruto as unknown[][]) : null;
-                    const celulas: unknown[][] =
-                      primeira ??
-                      ((bruto as Planilha[]).find((p) => (p?.data?.length || 0) > 1)?.data ??
-                        (bruto as Planilha[])[0]?.data ??
-                        []);
-                    const grade = celulas.map((l) =>
-                      (Array.isArray(l) ? l : []).map((c) =>
-                        c === null || c === undefined ? "" : String(c).trim()
-                      )
-                    );
-                    const uteis = grade.filter((l) => l.some((c) => c !== ""));
-                    if (uteis.length < 2) {
-                      setMsg("A planilha não tem linhas de dados abaixo do cabeçalho.");
-                      setTabela(null);
-                      return;
-                    }
-                    const tab = uteis.slice(acharCabecalho(uteis));
-                    setRaw("");
-                    setTabela(tab);
-                    const salvo = maps[canal];
-                    setMap(salvo ? mapFromNames(salvo, tab[0]) : autoMap(tab[0]));
-                    setMsg(null);
-                  })
-                  .catch(() =>
-                    setMsg(
-                      "Não consegui abrir essa planilha. Se ela veio dentro de um .zip, " +
-                      "descompacte primeiro e escolha a planilha de dentro."
-                    )
-                  );
+                if (!ehZip) {
+                  const fr = new FileReader();
+                  fr.onload = () => { const t = String(fr.result || ""); setRaw(t); analisar(t); };
+                  fr.readAsText(f, "utf-8");
                   return;
                 }
-                const fr = new FileReader();
-                fr.onload = () => { const t = String(fr.result || ""); setRaw(t); analisar(t); };
-                fr.readAsText(f, "utf-8");
+                setMsg("Lendo a planilha\u2026");
+                try {
+                  const grade = await lerPlanilha(f);
+                  const uteis = grade.filter((l) => l.some((c) => c !== ""));
+                  if (uteis.length < 2) {
+                    setMsg("A planilha n\u00e3o tem linhas de dados abaixo do cabe\u00e7alho.");
+                    setTabela(null);
+                    return;
+                  }
+                  const tab = uteis.slice(acharCabecalho(uteis));
+                  setRaw("");
+                  setTabela(tab);
+                  const salvo = maps[canal];
+                  setMap(salvo ? mapFromNames(salvo, tab[0]) : autoMap(tab[0]));
+                  setMsg(null);
+                } catch {
+                  setMsg(
+                    "N\u00e3o consegui abrir essa planilha. Se ela veio dentro de um .zip, " +
+                    "descompacte primeiro e escolha a planilha de dentro."
+                  );
+                  setTabela(null);
+                }
               });
             }} />
           </div>
